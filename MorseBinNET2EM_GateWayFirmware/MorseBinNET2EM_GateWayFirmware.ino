@@ -6,6 +6,7 @@
 #include "secrets.h"
 WiFiServer server(serverPort);
 #endif
+boolean gateWayManagingMessage = false;
 boolean addresses[255];
 unsigned long addressTimeStamp[255];
 MorseBinNET2E net("00000001", 2);
@@ -44,12 +45,14 @@ void loop() {
 #ifdef bridgeMode
   handleBridgeMode();
 #endif
+  gateWayManagingMessage = false;
 }
 void handleNewDevice() {
   if (net.lastMessage[0] == "errSuccess") {
     if (net.lastMessage[1] == "00000000") {
       if (net.lastMessage[3] == "00000001" && net.lastMessage[5] == "11111111" && net.lastMessage[6] == "11111111" && net.lastMessage[7] == "11111111" && net.lastMessage[8] == "11111111" && net.lastMessage[9] == "11111111" && net.lastMessage[10] == "11111111") {
         String freeAddress = "";
+        gateWayManagingMessage = true;
         if (addresses[MBStringToNum(net.lastMessage[4])] == false) {
           freeAddress = net.lastMessage[4];
           addresses[MBStringToNum(net.lastMessage[4])] = true;
@@ -97,6 +100,7 @@ void checkLease() {
 void handleRefresh() {
   if (net.lastMessage[0] == "errSuccess") {
     if (net.lastMessage[3] == "00000010" && net.lastMessage[4] == "11111111" && net.lastMessage[5] == "11111111" && net.lastMessage[6] == "11111111" && net.lastMessage[7] == "11111111" && net.lastMessage[8] == "11111111" && net.lastMessage[9] == "11111111" && net.lastMessage[10] == "11111111") {
+      gateWayManagingMessage = true;
       Serial.println("Address Ackknowledge for" + net.lastMessage[1]);
       Ackknowledge();
       addresses[MBStringToNum(net.lastMessage[1])] = true;
@@ -111,14 +115,13 @@ void Ackknowledge() {
 void handleBridgeMode() {
   WiFiClient client = server.available();
   String clientMessage = readStringFromClient(client);
-  if ((clientMessage == "00000101") && ((!(net.lastMessage[3] == "00000000" && net.lastMessage[4] == "11111111" && net.lastMessage[5] == "11111111" && net.lastMessage[6] == "11111111" && net.lastMessage[7] == "11111111" && net.lastMessage[8] == "11111111" && net.lastMessage[9] == "11111111" && net.lastMessage[10] == "11111111" && net.lastMessage[11] == "11111111") || !(net.lastMessage[3] == "00000001" && net.lastMessage[4] == "11111111" && net.lastMessage[5] == "11111111" && net.lastMessage[6] == "11111111" && net.lastMessage[7] == "11111111" && net.lastMessage[8] == "11111111" && net.lastMessage[9] == "11111111" && net.lastMessage[10] == "11111111") || !(net.lastMessage[3] == "0000010" && net.lastMessage[4] == "11111111" && net.lastMessage[5] == "11111111" && net.lastMessage[6] == "11111111" && net.lastMessage[7] == "11111111" && net.lastMessage[8] == "11111111" && net.lastMessage[9] == "11111111" && net.lastMessage[10] == "11111111")))) {
-    client.print("00000010" + net.lastMessage[1] + net.lastMessage[3] + net.lastMessage[4] + net.lastMessage[5] + net.lastMessage[6] + net.lastMessage[7] + net.lastMessage[8] + net.lastMessage[9] + net.lastMessage[10]);
+  if (net.lastMessage[0] == "errSuccess" && !(gateWayManagingMessage)) {
+    server.print("00000010" + net.lastMessage[1] + net.lastMessage[3] + net.lastMessage[4] + net.lastMessage[5] + net.lastMessage[6] + net.lastMessage[7] + net.lastMessage[8] + net.lastMessage[9] + net.lastMessage[10]);
     Serial.println("Sent latest Message to client!");
-  } else if (clientMessage == "00000101") {
-    client.print("NoMessage");
   }
   if (clientMessage.substring(0, 8) == "00000011") {
     net.send(clientMessage.substring(8, 16), clientMessage.substring(16, 24), clientMessage.substring(24, 32), clientMessage.substring(32, 40), clientMessage.substring(40, 48), clientMessage.substring(48, 56), clientMessage.substring(56, 64), clientMessage.substring(64, 72), clientMessage.substring(72, 80));
+    Serial.println("Sent message from Client!");
   } else if (clientMessage == "00000100") {
     String addressesString = "";
     for (int i = 0; i <= 255; i++) {
